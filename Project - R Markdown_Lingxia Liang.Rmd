@@ -1,0 +1,56 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Lingxia Liang"
+date: "Saturday, October 25, 2014"
+output: html_document
+---
+
+
+I first imported the project training data from csv format into R. Then I further split the data into two parts. Part 1 was used for Model training and parameter tuning based on cross validation, which accounted for 70% of the available training data. The rest 30% of the training data was held out and later on used as my testing set in order to get an unbiased estimate of the out of sample error of my prediction model.
+
+Given below are the R codes that I used to separate the imported training data  into my training set and my testing set.
+
+```{r get the data}
+# separate the project training data
+setwd("C:/Lingxia Liang/Machine Learning/Project/Program")
+mydata <- read.table("pml-training.csv", header=TRUE, sep=",")
+dim(mydata)
+
+library(caret)
+inTrain <- createDataPartition(y=mydata$classe, p=0.7, list=FALSE)
+training <- mydata[inTrain,]
+testing <- mydata[-inTrain,]
+dim(training); dim(testing)
+```
+
+Next, I explored my training data a lot and managed to reduce the number of variables from 160 to 53. I removed all the near zero variance variables, and columns 1 through 7 (record number, participant's name, sensing timestamp, etc.) because they are not related to how the exercise was performed. I also found there are dozens of columns with almost all missing values (NA). These variables should be thrown away as well. After I was done with cleaning my training set, I performed the exactly same manipulation on my testing set.
+
+```{r data manipulation}
+# identify the near zero variance variables
+nzv <- nearZeroVar(training)
+col.rm = c(c(1,2,3,4,5,7), nzv)
+training.1 = training[-col.rm]
+# Get rid of the columns with more than 50% of elements being missing values. 
+mytraining = training.1[, !(colSums(is.na(training.1))/dim(training.1)[1] > 0.5)] 
+
+# manipulate my testing set in the same way
+testing.1 = testing[-col.rm]
+mytesting = testing.1[, !(colSums(is.na(training.1))/dim(training.1)[1] > 0.5)]
+dim(mytraining); dim(mytesting)
+```
+
+At this point in time, I am ready to build my prediction model based on my trimmed training set. I decided to choose Random Forest algorithm because of its outstanding accuracy. I used 10-fold cross validation to help determine the optimal model tuning parameters and estimate model performance. Once I got the optimal prediction model, I evaluated the model on my held-out tesing data and obtained an estimate of out-of-sample error rate.
+
+```{r model building and make prediction on my testing set}
+# model building
+fitControl <- trainControl(method="cv", number=10)
+modelFit <- train(mytraining$classe ~ ., method="rf", data=mytraining, trControl=fitControl )
+modelFit
+# apply the prediction model to my testing set
+pred <- predict(modelFit, mytesting)
+confusionMatrix(mytesting$classe, pred)
+```
+
+The prediction on my testing set seemed very accurate with 99.22% accuracy. So the estimated out of sample error rate for my Random Forest prediction model is about 0.78%.
+
+
